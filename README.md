@@ -9,3 +9,10 @@ Call the Windows Resouces API to replace application icons of an executable file
 |:------:|:-----:|:---------:|:---------:|
 |🚫|🚫|🆗|🆗|
 
+Commands
+---
+
+```c
+// --- Main
+SET_APPLICATION_ICON
+```
