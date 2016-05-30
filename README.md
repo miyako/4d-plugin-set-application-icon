@@ -30,7 +30,3 @@ $path:=System folder(Desktop)+"4D.exe"
 
 SET APPLICATION ICON($path;$icon)
 ```
-
-* Example of an application with custom large PNG icon:
- 
-![v12](https://cloud.githubusercontent.com/assets/1725068/15647602/a56aff6a-269f-11e6-8e73-e5979182f170.png)
