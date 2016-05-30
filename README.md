@@ -23,5 +23,10 @@ SET_APPLICATION_ICON
 
 ##Example
 ```
+$path:=Get 4D folder(Current Resources folder)+"4D.png"
+READ PICTURE FILE($path;$icon)
 
+$path:=System folder(Desktop)+"4D.exe"
+
+SET APPLICATION ICON($path;$icon)
 ```
