@@ -7,6 +7,8 @@ Pass a 256 x 256 image for the best results.
 
 **Note:** probably not compatible with Windows XP which does not support PNG icons.
 
+Obviously you shouldn't modify your own icon at runtime. To simply change the icon of a window, consider [https://github.com/miyako/4d-plugin-midi]. 
+
 ##Platform
 
 | carbon | cocoa | win32 | win64 |
