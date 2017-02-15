@@ -38,7 +38,7 @@ SET APPLICATION ICON(path;icon)
 Parameter|Type|Description
 ------------|------|----
 path|TEXT|Path to the application to modify
-icon|IMAGE|Icon image; pass a ``256x256`` PNG for best results
+icon|PICTURE|Icon image; pass a ``256x256`` PNG for best results
 
 
 ##Example
