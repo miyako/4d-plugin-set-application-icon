@@ -53,7 +53,7 @@ void getPNG(PA_Picture *picture, std::vector<uint8_t> &buf)
 	unsigned i = 0;
 	PA_Unistring t;
 	std::map<CUTF8String, uint32_t> types;
-	while (err == eER_NoErr)
+	while (err == eER_NoErr && i < 64)//FIX: bounded, do not rely solely on the SDK setting an error past the last entry
 	{
 		t = PA_GetPictureData(*picture, ++i, NULL);
 		err = PA_GetLastError();
@@ -96,11 +96,24 @@ void getPNG(PA_Picture *picture, std::vector<uint8_t> &buf)
 		if(err == eER_NoErr)
 		{
 			unsigned long insize = PA_GetHandleSize(h);
-			buf.resize(insize);
-			memcpy(&buf[0], (const void *)PA_LockHandle(h), insize);
-			PA_UnlockHandle(h);
-			PA_DisposeHandle(h);
+			if(insize > 0)//FIX: &buf[0] on an empty vector is undefined
+			{
+				const uint8_t *src = (const uint8_t *)PA_LockHandle(h);
+				if(src)
+				{
+					try
+					{
+						buf.assign(src, src + insize);
+					}
+					catch(...)
+					{
+						buf.clear();//FIX: never leave the handle locked/leaked on bad_alloc
+					}
+				}
+				PA_UnlockHandle(h);
+			}
 		}
+		PA_DisposeHandle(h);//FIX: was only reached on success
 	}
 }
 
@@ -216,8 +229,8 @@ BOOL CALLBACK myEnumResNameProc(
 	return resourceIds->getSize() == 0;
 }
 
-BOOL myEnumResLangProc(
-								HANDLE hModule,
+BOOL CALLBACK myEnumResLangProc(//FIX: missing CALLBACK (__stdcall) corrupts the stack on 32-bit
+								HMODULE hModule,
 								LPCTSTR lpszType,
 								LPCTSTR lpszName,
 								WORD wIDLanguage,
@@ -244,6 +257,10 @@ void SET_APPLICATION_ICON(sLONG_PTR *pResult, PackagePtr pParams)
 	Param1.fromParamAtIndex(pParams, 1);
 	Param2.fromParamAtIndex(pParams, 2);
 
+#if !VERSIONWIN
+	return;//FIX: the icon is only ever applied on Windows; do not render six PNGs just to discard them
+#endif
+
 	PA_Picture picture = *(PA_Picture *)(pParams[1]);
 	
 	//convert to png
@@ -251,7 +268,8 @@ void SET_APPLICATION_ICON(sLONG_PTR *pResult, PackagePtr pParams)
 	args[0] = PA_CreateVariable(eVK_Picture);
 	args[1] = PA_CreateVariable(eVK_Unistring);
 	PA_SetPictureVariable(&args[0], PA_DuplicatePicture(picture, 1));
-	PA_Unistring u = PA_CreateUnistring((PA_Unichar *)".\0p\0n\0g\0\0\0");
+	PA_Unichar pngExtension[] = { '.', 'p', 'n', 'g', 0 };//FIX: was a hand-interleaved char literal cast to PA_Unichar*
+	PA_Unistring u = PA_CreateUnistring(pngExtension);
 	PA_SetStringVariable(&args[1], &u);
 	PA_ExecuteCommandByID(1002, args, 2);
 	picture = PA_DuplicatePicture(PA_GetPictureVariable(args[0]), 1);
@@ -310,7 +328,15 @@ void SET_APPLICATION_ICON(sLONG_PTR *pResult, PackagePtr pParams)
 		FreeLibrary(hModule);
 	}
 	
-	HANDLE hResouce = BeginUpdateResource((LPCWSTR)Param1.getUTF16StringPtr(), FALSE);
+	//FIX: never open an update session unless everything needed to complete it is in hand
+	//(empty buffers would make UpdateResource(NULL, 0) DELETE the resource; missing ids would throw after Begin)
+	bool canUpdate = (hModule != NULL)
+	&& (iconResourceIds.size() >= 6)
+	&& !png16.empty() && !png32.empty() && !png48.empty()
+	&& !png64.empty() && !png128.empty() && !png256.empty();
+	bool updateOK = true;
+
+	HANDLE hResouce = canUpdate ? BeginUpdateResource((LPCWSTR)Param1.getUTF16StringPtr(), FALSE) : NULL;
 	
 	if(hResouce)
 	{
@@ -395,7 +421,8 @@ void SET_APPLICATION_ICON(sLONG_PTR *pResult, PackagePtr pParams)
 										 ))
 			{
 				char str[100];
-				sprintf_s(str, "UpdateResource:RT_ICON failed! %d \n", GetLastError());
+				updateOK = false;
+				sprintf_s(str, "UpdateResource:RT_ICON failed! %lu \n", (unsigned long)GetLastError());
 				OutputDebugStringA(str);
 			}
 		}
@@ -411,14 +438,15 @@ void SET_APPLICATION_ICON(sLONG_PTR *pResult, PackagePtr pParams)
 									 ))
 		{
 			char str[100];
-			sprintf_s(str, "UpdateResource:RT_GROUP_ICON failed! %d \n", GetLastError());
+			updateOK = false;
+			sprintf_s(str, "UpdateResource:RT_GROUP_ICON failed! %lu \n", (unsigned long)GetLastError());
 			OutputDebugStringA(str);
 		}
 				
-		if(!EndUpdateResource(hResouce, FALSE))
+		if(!EndUpdateResource(hResouce, updateOK ? FALSE : TRUE))//FIX: TRUE discards a partial update instead of committing it
 		{
 			char str[100];
-			sprintf_s(str, "EndUpdateResource failed! %d \n", GetLastError());
+			sprintf_s(str, "EndUpdateResource failed! %lu \n", (unsigned long)GetLastError());
 			OutputDebugStringA(str);
 		}
 	}
