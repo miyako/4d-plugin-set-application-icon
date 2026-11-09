@@ -10,6 +10,66 @@ It is useful when 4D's own application builder can't produce the icon you want. 
 
 **Platforms:** Windows only. On macOS the command is accepted and does nothing.
 
+## Source version and manual publication
+
+**Bump version** and **Build** are separate manual Actions workflows. Neither
+branch pushes nor tags automatically build or publish. Select a branch when
+dispatching Bump version and choose `patch`, `minor`, or `major`. It validates
+the immutable dispatch commit and clean checkout, then commits only the source
+version metadata to that exact branch. Initial and final remote checks plus a
+mandatory executable pre-push hook reject branch advance, rewind, deletion,
+same-result races, or any update other than one direct-child commit. Pushes are
+non-forced and explicitly disable following tags. A stale dispatch must be
+dispatched again; it is never rebased or retried.
+
+The source release authority is the strict `X.Y.Z` `MARKETING_VERSION`, coordinated
+across all three configurations with `CURRENT_PROJECT_VERSION`, the root
+`Info.plist` version fields that exist, and `English.lproj/InfoPlist.strings`.
+Known Xcode version references remain references; absent `CFBundleVersion` is
+not added. BOMs, line endings, file modes and unrelated bytes are preserved.
+Prebuilt/example bundles, 4D project/schema counters, `locversion.plist`, the
+manifest and vendored 4D API are not release authorities and are not bumped.
+The original workflow header promised coordinated marketing/current versions,
+but commit `159a51d` updated only marketing and the root plist to `1.0.1`.
+This migration repairs source current settings (`1.0.0`) and localized display
+strings (`2.0`) to the existing `1.0.1`, without incrementing a release.
+
+Dispatch **Build** separately on the desired commit/branch, with **no inputs**.
+Every checkout uses its immutable `github.sha`. Build validates source versions
+and checks remote tags and every authenticated releases-list page, including
+drafts, before starting native work. It retains Windows x64, universal macOS,
+Windows artifact merge, resources, Developer ID signing and verification,
+both notarization submissions and DMG stapling. Only after those gates succeed
+does it repeat the availability checks and create a new lightweight `vX.Y.Z`
+tag at the exact selected SHA, verify it remotely, create a published
+non-prerelease with an empty notes body, then upload
+`Set Application Icon-X.Y.Z.zip` and `Set Application Icon-X.Y.Z.dmg` to the
+returned new release ID. Publication is serialized repo-wide across branches,
+without cancelling a running publication.
+
+**Failures and recovery:** existing tags or draft/published releases block
+publication. Authentication, network, 404, malformed responses or failures on
+later release pages also block it; they do not mean "available". Creation is
+create-only, including same-SHA tag races. Nothing deletes, updates, overwrites,
+rolls back or retries a tag, release or upload. If a POST/upload fails, inspect
+the retained tag, release and any earlier assets in GitHub (a failed request may
+already have succeeded remotely). Resolve the partial state deliberately outside
+this automation under the repository's release policy before a new dispatch.
+A blind rerun of the same version will be blocked.
+
+**Native caveats:** the legacy Windows project uses v100/Windows7.1SDK; Build
+keeps the existing hosted-runner overrides to v143/Windows SDK 10.0. The Xcode
+project's 11.5 deployment settings and Build's 10.13 override are unchanged.
+The macOS command remains a no-op, but the cross-platform bundle build remains
+mandatory. No native build, signing, notarization or workflow dispatch is needed
+for lifecycle regression checks, and none was executed for this migration.
+
+Run lifecycle regressions locally with
+`python3 -m unittest discover -s .github/tests -v` and lint with
+`actionlint .github/workflows/*.yml`. Bump tests modify temporary source copies;
+Git races use temporary local bare repositories and publication tests use
+stubbed API responses, not production tags or releases.
+
 ---
 
 ## Requirements & platform notes
