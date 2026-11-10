@@ -11,6 +11,8 @@
 
 #include "4DPluginAPI.h"
 #include "4DPlugin.h"
+#include "CommandArguments.h"
+#include <cstdio>
 
 void PluginMain(PA_long32 selector, PA_PluginParameters params)
 {
@@ -24,7 +26,7 @@ void PluginMain(PA_long32 selector, PA_PluginParameters params)
 	}
 	catch(...)
 	{
-
+		fprintf(stderr, "Set Application Icon: native command failed\n");
 	}
 }
 
@@ -126,81 +128,20 @@ void getIcons(PA_Picture *picture,
 							std::vector<uint8_t> &png256)
 {
 	//96 is automatically rendered by windows
-	PA_Picture icon16, icon32, icon48, icon64, icon128, icon256;
-	
-	PA_Variable args[4];
-	
-	args[0] = PA_CreateVariable(eVK_Picture);
-	args[2] = PA_CreateVariable(eVK_Longint);
-	args[3] = PA_CreateVariable(eVK_Longint);
-	
-	PA_SetPictureVariable(&args[0], PA_DuplicatePicture(*picture, 1));
-	
-	//Small
-	args[1] = PA_CreateVariable(eVK_Picture);
-	PA_SetLongintVariable(&args[2], 16);
-	PA_SetLongintVariable(&args[3], 16);
-	PA_ExecuteCommandByID(679, args, 4);
-	icon16 = PA_DuplicatePicture(PA_GetPictureVariable(args[1]), 1);
-	PA_ClearVariable(&args[1]);
-	
-	//
-	args[1] = PA_CreateVariable(eVK_Picture);
-	PA_SetLongintVariable(&args[2], 32);
-	PA_SetLongintVariable(&args[3], 32);
-	PA_ExecuteCommandByID(679, args, 4);
-	icon32 = PA_DuplicatePicture(PA_GetPictureVariable(args[1]), 1);
-	PA_ClearVariable(&args[1]);
-	
-	//Medium
-	args[1] = PA_CreateVariable(eVK_Picture);
-	PA_SetLongintVariable(&args[2], 48);
-	PA_SetLongintVariable(&args[3], 48);
-	PA_ExecuteCommandByID(679, args, 4);
-	icon48 = PA_DuplicatePicture(PA_GetPictureVariable(args[1]), 1);
-	PA_ClearVariable(&args[1]);
-	
-	//
-	args[1] = PA_CreateVariable(eVK_Picture);
-	PA_SetLongintVariable(&args[2], 64);
-	PA_SetLongintVariable(&args[3], 64);
-	PA_ExecuteCommandByID(679, args, 4);
-	icon64 = PA_DuplicatePicture(PA_GetPictureVariable(args[1]), 1);
-	PA_ClearVariable(&args[1]);
-	
-	//
-	args[1] = PA_CreateVariable(eVK_Picture);
-	PA_SetLongintVariable(&args[2], 128);
-	PA_SetLongintVariable(&args[3], 128);
-	PA_ExecuteCommandByID(679, args, 4);
-	icon128 = PA_DuplicatePicture(PA_GetPictureVariable(args[1]), 1);
-	PA_ClearVariable(&args[1]);
-	
-	//Extra Large
-	args[1] = PA_CreateVariable(eVK_Picture);
-	PA_SetLongintVariable(&args[2], 256);
-	PA_SetLongintVariable(&args[3], 256);
-	PA_ExecuteCommandByID(679, args, 4);
-	icon256 = PA_DuplicatePicture(PA_GetPictureVariable(args[1]), 1);
-	PA_ClearVariable(&args[1]);
-	
-	PA_ClearVariable(&args[0]);
-	PA_ClearVariable(&args[2]);
-	PA_ClearVariable(&args[3]);
-	
-	getPNG(&icon16,  png16);
-	getPNG(&icon32,  png32);
-	getPNG(&icon48,  png48);
-	getPNG(&icon64,  png64);
-	getPNG(&icon128, png128);
-	getPNG(&icon256, png256);
-	
-	PA_DisposePicture(icon16);
-	PA_DisposePicture(icon32);
-	PA_DisposePicture(icon48);
-	PA_DisposePicture(icon64);
-	PA_DisposePicture(icon128);
-	PA_DisposePicture(icon256);
+	const unsigned sizes[] = {16, 32, 48, 64, 128, 256};
+	std::vector<uint8_t> *outputs[] = {&png16, &png32, &png48, &png64, &png128, &png256};
+	for(unsigned i = 0; i < 6; ++i)
+	{
+		CommandArguments<4> arguments;
+		PA_Variable *args = arguments.values;
+		PA_SetPictureVariable(&args[0], PA_DuplicatePicture(*picture, 1));
+		args[1] = PA_CreateVariable(eVK_Picture);
+		PA_SetLongintVariable(&args[2], sizes[i]);
+		PA_SetLongintVariable(&args[3], sizes[i]);
+		arguments.executeChecked(679);
+		PA_Picture icon = PA_GetPictureVariable(args[1]);
+		getPNG(&icon, *outputs[i]);
+	}
 }
 
 #pragma mark -
@@ -264,17 +205,14 @@ void SET_APPLICATION_ICON(sLONG_PTR *pResult, PackagePtr pParams)
 	PA_Picture picture = *(PA_Picture *)(pParams[1]);
 	
 	//convert to png
-	PA_Variable args[2];
-	args[0] = PA_CreateVariable(eVK_Picture);
-	args[1] = PA_CreateVariable(eVK_Unistring);
+	CommandArguments<2> arguments;
+	PA_Variable *args = arguments.values;
 	PA_SetPictureVariable(&args[0], PA_DuplicatePicture(picture, 1));
 	PA_Unichar pngExtension[] = { '.', 'p', 'n', 'g', 0 };//FIX: was a hand-interleaved char literal cast to PA_Unichar*
 	PA_Unistring u = PA_CreateUnistring(pngExtension);
 	PA_SetStringVariable(&args[1], &u);
-	PA_ExecuteCommandByID(1002, args, 2);
-	picture = PA_DuplicatePicture(PA_GetPictureVariable(args[0]), 1);
-	PA_ClearVariable(&args[0]);
-	PA_ClearVariable(&args[1]);
+	arguments.executeChecked(1002);
+	picture = PA_GetPictureVariable(args[0]);
 	
 	std::vector<uint8_t> png16;
 	std::vector<uint8_t> png32;
@@ -284,8 +222,6 @@ void SET_APPLICATION_ICON(sLONG_PTR *pResult, PackagePtr pParams)
 	std::vector<uint8_t> png256;
 	
 	getIcons(&picture, png16, png32, png48, png64, png128, png256);
-	
-	PA_DisposePicture(picture);
 	
 #if VERSIONWIN
 	

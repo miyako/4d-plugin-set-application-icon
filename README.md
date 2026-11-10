@@ -72,6 +72,17 @@ stubbed API responses, not production tags or releases.
 
 ---
 
+## Native ownership regression
+
+Run `python3 .github/tests/test_ownership.py` on macOS for unsigned,
+offline ASan/UBSan checks of the actual dispatcher, all wrappers and the
+complete unchanged bundled SDK. Platform operations use synthetic stubs;
+this does not modify icons, build a plugin bundle or publish a release.
+See the [ownership inventory, contracts, baseline regressions and explicit
+limits](.github/tests/ownership-audit.md). Native command failures now emit
+a diagnostic to standard error; the 4D command still returns nothing.
+These source fixes do not update the tracked prebuilt plugin binaries.
+
 ## Requirements & platform notes
 
 - **Windows Vista or later.** The icons are stored as PNG-compressed images, which Windows XP doesn't support.
