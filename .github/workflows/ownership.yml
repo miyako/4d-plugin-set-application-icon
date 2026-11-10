@@ -1,0 +1,31 @@
+name: Ownership regression
+
+on:
+  push:
+    branches: [master, miyako-application-icon-ownership]
+    paths:
+      - '4DPlugin.cpp'
+      - '4DPlugin.h'
+      - '4D Plugin API/**'
+      - '.github/tests/ownership_*'
+      - '.github/tests/test_ownership.py'
+      - '.github/workflows/ownership.yml'
+  pull_request:
+    paths:
+      - '4DPlugin.cpp'
+      - '4DPlugin.h'
+      - '4D Plugin API/**'
+      - '.github/tests/ownership_*'
+      - '.github/tests/test_ownership.py'
+      - '.github/workflows/ownership.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ownership:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unsigned offline full-SDK ownership regression
+        run: python3 .github/tests/test_ownership.py
